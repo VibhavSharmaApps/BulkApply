@@ -10,8 +10,15 @@ import { UploadCloud } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/router";
 
+// Define a proper type for job applications instead of using any
+interface JobApplication {
+  id: number;
+  title: string;
+  board: string;
+}
+
 export default function Dashboard() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
@@ -20,11 +27,11 @@ export default function Dashboard() {
     }
   }, [status, router]);
 
+  // Form state for profile & resume upload
   const [jobTitle, setJobTitle] = useState("");
   const [location, setLocation] = useState("");
   const [experience, setExperience] = useState("");
   const [resume, setResume] = useState<File | null>(null);
-  const [applications, setApplications] = useState<any[]>([]);
 
   const [currentSalary, setCurrentSalary] = useState("");
   const [expectedSalary, setExpectedSalary] = useState("");
@@ -32,6 +39,9 @@ export default function Dashboard() {
   const [preferredLocations, setPreferredLocations] = useState("");
   const [experienceSummary, setExperienceSummary] = useState("");
   const [education, setEducation] = useState("");
+
+  // State for job applications, typed properly
+  const [applications, setApplications] = useState<JobApplication[]>([]);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();

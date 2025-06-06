@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import formidable, { File } from "formidable";
-import fs from "fs";
+//import fs from "fs";
 
 // Disable the default body parser for file uploads
 export const config = {
