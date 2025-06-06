@@ -7,21 +7,95 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  resumes   Resume[] // 👈 This is the relation array
-  createdAt DateTime @default(now())
-}
-
 model Resume {
   id         String   @id @default(uuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id]) // 👈 Moved below userId
+  user       User     @relation(fields: [userId], references: [id])
   jobTitle   String
   location   String
   experience Int
   resumeUrl  String
   uploadedAt DateTime @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id              String           @id @default(uuid())
+  name            String?
+  email           String           @unique
+  emailVerified   DateTime?
+  password        String?
+  resumes         Resume[]
+  accounts        Account[]
+  sessions        Session[]
+  jobApplications JobApplication[]
+
+  userProfile UserProfile? // just the relation field, no @relation(...) attributes
+
+  createdAt DateTime @default(now())
+}
+
+model UserProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  jobTitle           String?
+  location           String?
+  experience         Int?
+  currentSalary      Int?
+  expectedSalary     Int?
+  noticePeriod       Int?
+  preferredLocations String?
+  experienceSummary  String?
+  education          String?
+  resumeUrl          String?
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model JobApplication {
+  id        String   @id @default(uuid())
+  title     String
+  board     String
+  company   String?
+  location  String?
+  status    String? // e.g., applied, rejected, interview
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
 }

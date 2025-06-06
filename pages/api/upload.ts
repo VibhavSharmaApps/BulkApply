@@ -1,10 +1,7 @@
-// pages/api/upload.ts
-
-import type { NextApiRequest, NextApiResponse } from 'next';
-import formidable from 'formidable';
-import { promises as fs } from 'fs';
-import prisma from '@/lib/prisma';
-import { v4 as uuidv4 } from 'uuid';
+import { NextApiRequest, NextApiResponse } from "next";
+import formidable from "formidable";
+import fs from "fs";
+import path from "path";
 
 export const config = {
   api: {
@@ -12,43 +9,69 @@ export const config = {
   },
 };
 
-// Dummy user for testing
-const DUMMY_USER_ID = 'your-test-user-id'; // Replace with a real one after signup/login flow
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-  const form = formidable({ multiples: false });
+  const uploadDir = path.join(process.cwd(), "/uploads");
+  fs.mkdirSync(uploadDir, { recursive: true });
 
-  form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(500).json({ error: 'Failed to parse form data' });
+  // Create formidable form with options
+  const form = formidable({
+    uploadDir,
+    keepExtensions: true,
+  });
 
-    const { jobTitle, location, experience } = fields;
-    const fileField = files.resume;
-    const file = Array.isArray(fileField) ? fileField[0] : fileField;
-
-    if (!file || !jobTitle || !location || !experience) {
-    return res.status(400).json({ error: 'Missing required fields or file' });
+  form.parse(req, (err, fields, files) => {
+    if (err) {
+      console.error("Form parse error:", err);
+      return res.status(500).json({ error: "Failed to parse form" });
     }
 
+    // Extract fields from parsed form
+    const {
+      jobTitle,
+      location,
+      experience,
+      currentSalary,
+      expectedSalary,
+      noticePeriod,
+      preferredLocations,
+      experienceSummary,
+      education
+    } = fields;
 
-    // Simulate uploading to Cloudflare — you can replace this later
-    const uploadedUrl = `https://fake-cdn.cloudflare.com/uploads/${uuidv4()}.pdf`;
+    // Files.resume can be File or array depending on multiple files - check accordingly
+    // If your form sends one file only, files.resume should be a single object
+    const resumeFile = files.resume;
 
-    try {
-      const resume = await prisma.resume.create({
-        data: {
-          userId: DUMMY_USER_ID,
-          jobTitle: String(jobTitle),
-          location: String(location),
-          experience: Number(experience),
-          resumeUrl: uploadedUrl,
-        },
-      });
-
-      res.status(200).json({ message: 'Resume uploaded successfully', resume });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to save resume to DB' });
+    if (!resumeFile) {
+      return res.status(400).json({ error: "Resume upload failed" });
     }
+
+    // Depending on your form setup, resumeFile may be an array or single object
+    // Normalize to single file object if array
+    const resume = Array.isArray(resumeFile) ? resumeFile[0] : resumeFile;
+
+    // Prepare your user profile data
+    const userProfile = {
+      jobTitle,
+      location,
+      experience,
+      currentSalary,
+      expectedSalary,
+      noticePeriod,
+      preferredLocations,
+      experienceSummary,
+      education,
+      resumePath: resume.filepath,  // this should exist for saved file path
+      uploadedAt: new Date(),
+    };
+
+
+    console.log("Saved profile:", userProfile);
+
+    return res.status(200).json({ message: "Uploaded successfully" });
   });
 }

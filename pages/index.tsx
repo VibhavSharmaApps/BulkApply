@@ -1,77 +1,103 @@
-// pages/index.tsx (Login Page)
-"use client";
-
+// pages/index.tsx
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/router";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { LogIn } from "lucide-react";
 
-export default function LoginPage() {
+export default function Home() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [isSignup, setIsSignup] = useState(false);
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const toggleMode = () => {
+    setIsSignup(!isSignup);
+    setError("");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Placeholder logic — replace with real auth logic
-    if (email && password) {
-      router.push("/dashboard");
+    setError("");
+
+    if (isSignup) {
+      // Signup flow
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      if (res.ok) {
+        // Auto-login after signup
+        const signInRes = await signIn("credentials", {
+          redirect: false,
+          ...formData,
+        });
+
+        if (signInRes?.ok) router.push("/dashboard"); // adjust if needed
+        else setError("Login after signup failed.");
+      } else {
+        const body = await res.json();
+        setError(body?.message || "Signup failed.");
+      }
     } else {
-      alert("Please enter credentials");
+      // Login flow
+      const res = await signIn("credentials", {
+        ...formData,
+        redirect: false,
+      });
+
+      if (res?.ok) router.push("/dashboard"); // adjust if needed
+      else setError("Invalid email or password.");
     }
   };
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4">
-      <div className="grid md:grid-cols-2 bg-gray-900 rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden">
-        {/* Welcome Section */}
-        <div className="hidden md:flex flex-col justify-center p-10 bg-gradient-to-br from-gray-800 to-gray-700">
-          <h1 className="text-3xl font-bold mb-4">Welcome to JobSwift</h1>
-          <p className="text-gray-300 text-sm">
-            Automatically apply to relevant jobs based on your profile. Upload your resume, set your preferences, and let us do the heavy lifting.
-          </p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <form onSubmit={handleSubmit} className="max-w-md w-full space-y-4">
+        <h1 className="text-2xl font-semibold text-center">
+          {isSignup ? "Sign Up" : "Login"}
+        </h1>
 
-        {/* Login Form */}
-        <div className="p-10">
-          <form onSubmit={handleLogin} className="space-y-6">
-            <h2 className="text-2xl font-semibold mb-2 flex items-center gap-2">
-              <LogIn className="w-6 h-6" /> Login
-            </h2>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                type="email"
-                name="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-gray-800 border-gray-700"
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input
-                type="password"
-                name="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-gray-800 border-gray-700"
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full bg-gray-700 hover:bg-gray-600">
-              Sign In
-            </Button>
-          </form>
-        </div>
-      </div>
-    </main>
+        <input
+          type="email"
+          placeholder="Email"
+          className="w-full p-2 border rounded"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          required
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          className="w-full p-2 border rounded"
+          value={formData.password}
+          onChange={(e) =>
+            setFormData({ ...formData, password: e.target.value })
+          }
+          required
+        />
+
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 rounded"
+        >
+          {isSignup ? "Sign Up" : "Login"}
+        </button>
+
+        <p className="text-center text-sm text-gray-600">
+          {isSignup ? "Already have an account?" : "New user?"}{" "}
+          <button
+            type="button"
+            onClick={toggleMode}
+            className="text-blue-500 underline"
+          >
+            {isSignup ? "Login here" : "Sign up here"}
+          </button>
+        </p>
+      </form>
+    </div>
   );
 }
