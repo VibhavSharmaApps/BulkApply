@@ -1,23 +1,23 @@
 // lib/r2.ts - Utility to upload files to Cloudflare R2
-import AWS from 'aws-sdk';
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-// Setup S3 client with Cloudflare R2 credentials
-const s3 = new AWS.S3({
-  endpoint: process.env.R2_ENDPOINT,
-  accessKeyId: process.env.R2_ACCESS_KEY,
-  secretAccessKey: process.env.R2_SECRET_KEY,
-  signatureVersion: 'v4',
+const s3 = new S3Client({
+  region: "auto", // required by R2
+  endpoint: process.env.R2_ENDPOINT, // e.g., https://<account>.r2.cloudflarestorage.com
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY!,
+    secretAccessKey: process.env.R2_SECRET_KEY!,
+  },
 });
 
-// Upload a file buffer to R2 and return the URL
-export const uploadToR2 = async (file: Buffer, filename: string, mimetype: string) => {
-  const params = {
+export async function uploadToR2(fileBuffer: Buffer, fileName: string, mimeType: string) {
+  const command = new PutObjectCommand({
     Bucket: process.env.R2_BUCKET!,
-    Key: filename,
-    Body: file,
-    ContentType: mimetype,
-  };
+    Key: fileName,
+    Body: fileBuffer,
+    ContentType: mimeType,
+  });
 
-  const data = await s3.upload(params).promise();
-  return data.Location;
-};
+  await s3.send(command);
+  return `https://${process.env.R2_BUCKET}.${new URL(process.env.R2_ENDPOINT!).host}/${fileName}`;
+}
