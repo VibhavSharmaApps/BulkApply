@@ -60,7 +60,7 @@ export default function Dashboard() {
     formData.append("education", education);
 
     try {
-      const res = await fetch("/api/upload", {
+      const res = await fetch("https://r2-worker.vibhav-contact.workers.dev", {
         method: "POST",
         body: formData,
       });

@@ -1,7 +1,7 @@
-import { NextApiRequest, NextApiResponse } from "next";
-import formidable from "formidable";
+import type { NextApiRequest, NextApiResponse } from "next";
+import formidable, { File } from "formidable";
 import fs from "fs";
-import path from "path";
+import { Readable } from "stream";
 
 export const config = {
   api: {
@@ -10,68 +10,61 @@ export const config = {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const uploadDir = path.join(process.cwd(), "/uploads");
-  fs.mkdirSync(uploadDir, { recursive: true });
+  const form = new formidable.IncomingForm();
 
-  // Create formidable form with options
-  const form = formidable({
-    uploadDir,
-    keepExtensions: true,
+  form.parse(req, async (err, fields, files) => {
+    if (err) return res.status(500).json({ error: "Error parsing form" });
+
+    // Safely access the resume file from the parsed form
+      const resumeField = files.resume;
+
+      if (!resumeField) {
+        return res.status(400).json({ error: "Resume file is required" });
+      }
+
+      const file = Array.isArray(resumeField) ? resumeField[0] : resumeField as File;
+
+      if (!file || !file.filepath) {
+        return res.status(400).json({ error: "Invalid resume file" });
+      }
+
+
+    if (!file) return res.status(400).json({ error: "Resume file is required" });
+
+    try {
+      const fileStream = fs.createReadStream(file.filepath);
+      const buffer = await streamToBuffer(fileStream);
+
+      const uploadResponse = await fetch("https://<your-worker-subdomain>.workers.dev/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": file.mimetype || "application/pdf",
+          "X-Filename": file.originalFilename || "resume.pdf",
+        },
+        body: buffer,
+      });
+
+      if (!uploadResponse.ok) {
+        const errMsg = await uploadResponse.text();
+        return res.status(500).json({ error: `Upload to Worker failed: ${errMsg}` });
+      }
+
+      const result = await uploadResponse.json();
+      return res.status(200).json({ success: true, fileUrl: result.fileUrl });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: "Error uploading to R2" });
+    }
   });
+}
 
-  form.parse(req, (err, fields, files) => {
-    if (err) {
-      console.error("Form parse error:", err);
-      return res.status(500).json({ error: "Failed to parse form" });
-    }
-
-    // Extract fields from parsed form
-    const {
-      jobTitle,
-      location,
-      experience,
-      currentSalary,
-      expectedSalary,
-      noticePeriod,
-      preferredLocations,
-      experienceSummary,
-      education
-    } = fields;
-
-    // Files.resume can be File or array depending on multiple files - check accordingly
-    // If your form sends one file only, files.resume should be a single object
-    const resumeFile = files.resume;
-
-    if (!resumeFile) {
-      return res.status(400).json({ error: "Resume upload failed" });
-    }
-
-    // Depending on your form setup, resumeFile may be an array or single object
-    // Normalize to single file object if array
-    const resume = Array.isArray(resumeFile) ? resumeFile[0] : resumeFile;
-
-    // Prepare your user profile data
-    const userProfile = {
-      jobTitle,
-      location,
-      experience,
-      currentSalary,
-      expectedSalary,
-      noticePeriod,
-      preferredLocations,
-      experienceSummary,
-      education,
-      resumePath: resume.filepath,  // this should exist for saved file path
-      uploadedAt: new Date(),
-    };
-
-
-    console.log("Saved profile:", userProfile);
-
-    return res.status(200).json({ message: "Uploaded successfully" });
+function streamToBuffer(stream: Readable): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    stream.on("data", (chunk) => chunks.push(chunk));
+    stream.on("end", () => resolve(Buffer.concat(chunks)));
+    stream.on("error", reject);
   });
 }
